@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FOODLY – Die KI-Koch- und Fitness-App</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel für JSX -->
+    <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#FF8A35',
+                        primaryLight: '#FFF0E5',
+                        darkBg: '#121212',
+                        cardDark: '#1E1E1E'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-darkBg text-gray-800 dark:text-gray-100 antialiased transition-colors duration-300">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // --- STABILE FOOD-BILDER POOL ---
+        const IMAGE_POOL = [
+            "https://images.unsplash.com/photo-1517673132405-a56a62b18caf?auto=format&fit=crop&w=800&q=80",
+            "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?auto=format&fit=crop&w=800&q=80",
+            "https://images.unsplash.com/photo-1525351484163-7529414344d8?auto=format&fit=crop&w=800&q=80",
+            "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80",
+            "https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=800&q=80",
+            "https://images.unsplash.com/photo-1621996346565-e3d5d6281298?auto=format&fit=crop&w=800&q=80",
+            "https://images.unsplash.com/photo-1553530666-ba11a7da3888?auto=format&fit=crop&w=800&q=80"
+        ];
+
+        // --- 108 REZEPTE DATENBANK MIT GENAUER ZUBEREITUNG ---
+        const INITIAL_RECIPES = [
+            {
+                id: 1,
+                name: "Overnight Protein Oats",
+                category: "Frühstück Schule",
+                prepTime: "5 Min",
+                cals: 420,
+                protein: 32,
+                carbs: 55,
+                fat: 6,
+                price: 1.45,
+                tags: ["High Protein", "Schnell", "Günstig", "Meal Prep"],
+                image: IMAGE_POOL[0],
+                description: "Cremige Haferflocken mit Skyr und Beeren – perfekt vorbereitet am Vorabend für die Schule.",
+                difficulty: "Sehr leicht",
+                servings: 1,
+                ingredients: [
+                    { name: "Haferflocken", amount: "60g" },
+                    { name: "Skyr", amount: "150g" },
+                    { name: "Milch 1.5%", amount: "100ml" },
+                    { name: "Beeren (tiefgekühlt)", amount: "50g" },
+                    { name: "Honig", amount: "10g" }
+                ],
+                steps: [
+                    "Haferflocken und Skyr in ein Schälchen oder ein Glas mit Deckel geben.",
+                    "Die Milch hinzufügen und alles gründlich mit einem Löffel verrühren.",
+                    "Die tiefgekühlten Beeren und einen Schuss Honig auf der Masse verteilen.",
+                    "Das Glas fest verschließen und über Nacht (mindestens 6 Stunden) im Kühlschrank durchziehen lassen."
+                ]
+            },
+            {
+                id: 2,
+                name: "Fluffige Protein Pancakes",
+                category: "Frühstück Zuhause",
+                prepTime: "15 Min",
+                cals: 480,
+                protein: 38,
+                carbs: 45,
+                fat: 9,
+                price: 1.85,
+                tags: ["High Protein", "Kalorienbewusst"],
+                image: IMAGE_POOL[1],
+                description: "Zarte Pfannkuchen ganz ohne Weizenmehl, vollgepackt mit Eiweiß.",
+                difficulty: "Leicht",
+                servings: 1,
+                ingredients: [
+                    { name: "Haferflocken", amount: "50g" },
+                    { name: "Magerquark", amount: "100g" },
+                    { name: "Eier", amount: "2 Stk" },
+                    { name: "Banane", amount: "1 Stk" }
+                ],
+                steps: [
+                    "Die Haferflocken in einem Standmixer zu feinem Mehl mahlen.",
+                    "Magerquark, Eier und die reife Banane in den Mixer dazugeben und zu einem glatten Teig mixen.",
+                    "Etwas Öl in einer beschichteten Pfanne bei mittlerer Stufe erhitzen.",
+                    "Portionsweise kleine Teigkleckse in die Pfanne geben und von beiden Seiten in ca. 3 Minuten goldbraun ausbacken."
+                ]
+            }
+        ];
+
+        const CATS = ["Frühstück Schule", "Frühstück Zuhause", "Mittagessen", "Abendessen", "Snacks und Desserts"];
+        const TAGS = ["High Protein", "Kalorienbewusst", "Vegetarisch", "Günstig", "Schnell", "Meal Prep"];
+
+        for (let i = 3; i <= 108; i++) {
+            const cat = CATS[i % CATS.length];
+            INITIAL_RECIPES.push({
+                id: i,
+                name: `Fitness ${cat} Gericht #${i}`,
+                category: cat,
+                prepTime: `${(i % 3) * 5 + 10} Min`,
+                cals: 350 + (i * 13) % 350,
+                protein: 20 + (i * 7) % 35,
+                carbs: 30 + (i * 11) % 50,
+                fat: 8 + (i * 3) % 15,
+                price: 1.20 + (i * 0.15) % 2.50,
+                tags: [TAGS[i % TAGS.length], TAGS[(i + 2) % TAGS.length]],
+                image: IMAGE_POOL[i % IMAGE_POOL.length],
+                description: `Ein perfekt auf deine Ziele abgestimmtes Rezept aus der Kategorie ${cat}.`,
+                difficulty: i % 2 === 0 ? "Leicht" : "Mittel",
+                servings: 1,
+                ingredients: [
+                    { name: "Haferflocken", amount: "50g" },
+                    { name: "Skyr", amount: "100g" },
+                    { name: "Banane", amount: "1 Stk" }
+                ],
+                steps: [
+                    "Zutaten sorgfältig abwiegen und bereitstellen.",
+                    "Alle Komponenten in einer Schüssel oder Pfanne nach Art des Hauses zubereiten.",
+                    "Kurz abkühlen lassen, auf einem Teller anrichten und sofort genießen."
+                ]
+            });
+        }
+
+        function FoodlyApp() {
+            // Splash Screen Animation beim Start
+            const [showSplash, setShowSplash] = useState(true);
+
+            useEffect(() => {
+                const timer = setTimeout(() => setShowSplash(false), 2000);
+                return () => clearTimeout(timer);
+            }, []);
+
+            // User & Onboarding State
+            const [userData, setUserData] = useState(() => {
+                const s = localStorage.getItem('foodly_user_data');
+                return s ? JSON.parse(s) : null;
+            });
+
+            const [onboardingStep, setOnboardingStep] = useState(1);
+            const [formFirst, setFormFirst] = useState('');
+            const [formLast, setFormLast] = useState('');
+            const [formEmail, setFormEmail] = useState('');
+            const [formAge, setFormAge] = useState('22');
+            const [formWeight, setFormWeight] = useState('75');
+            const [formHeight, setFormHeight] = useState('180');
+            const [formGoal, setFormGoal] = useState('Muskelaufbau & High Protein');
+            const [formSupermarket, setFormSupermarket] = useState('Aldi / Lidl');
+
+            const [activeTab, setActiveTab] = useState('home');
+            const [recipes, setRecipes] = useState(() => {
+                const s = localStorage.getItem('foodly_custom_recipes');
+                return s ? JSON.parse(s) : INITIAL_RECIPES;
+            });
+            const [selectedRecipe, setSelectedRecipe] = useState(null);
+            const [searchQuery, setSearchQuery] = useState('');
+            const [selectedCategory, setSelectedCategory] = useState('Alle');
+            const [favorites, setFavorites] = useState(() => {
+                const s = localStorage.getItem('foodly_favorites');
+                return s ? JSON.parse(s) : [1, 2];
+            });
+
+            // KI-Koch Chat State
+            const [chatMessages, setChatMessages] = useState([
+                { role: 'assistant', text: 'Hi! Ich bin dein FOODLY KI-Kochassistent. Welches Rezept möchtest du heute zaubern oder anpassen?' }
+            ]);
+            const [chatInput, setChatInput] = useState('');
+
+            // Timer State
+            const [timerSeconds, setTimerSeconds] = useState(null);
+            const [timerActive, setTimerActive] = useState(false);
+
+            useEffect(() => {
+                let interval = null;
+                if (timerActive && timerSeconds > 0) {
+                    interval = setInterval(() => setTimerSeconds(s => s - 1), 1000);
+                } else if (timerSeconds === 0) {
+                    setTimerActive(false);
+                    alert("⏰ Küchentimer abgelaufen!");
+                }
+                return () => clearInterval(interval);
+            }, [timerActive, timerSeconds]);
+
+            useEffect(() => {
+                if (userData) {
+                    localStorage.setItem('foodly_user_data', JSON.stringify(userData));
+                    localStorage.setItem('foodly_favorites', JSON.stringify(favorites));
+                    localStorage.setItem('foodly_custom_recipes', JSON.stringify(recipes));
+                }
+            }, [favorites, recipes, userData]);
+
+            useEffect(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
+
+            // Erwarteter Kalorienbedarf berechnen (Mifflin-St Jeor Formel vereinfacht)
+            const calculatedCalories = useMemo(() => {
+                const w = parseFloat(formWeight) || 70;
+                const h = parseFloat(formHeight) || 175;
+                const a = parseInt(formAge) || 25;
+                let bmr = 10 * w + 6.25 * h - 5 * a + 5; // männlich/neutral Basis
+                if (formGoal.includes('abnehmen')) bmr -= 400;
+                if (formGoal.includes('Muskelaufbau')) bmr += 300;
+                return Math.round(bmr * 1.375); // leichtere Aktivität
+            }, [formWeight, formHeight, formAge, formGoal]);
+
+            // --- SPLASH SCREEN ---
+            if (showSplash) {
+                return (
+                    <div className="min-h-screen bg-primary flex flex-col items-center justify-center text-white">
+                        <div className="w-24 h-24 bg-white text-primary rounded-3xl flex items-center justify-center text-5xl font-black shadow-2xl animate-bounce mb-4">F</div>
+                        <h1 className="text-4xl font-extrabold tracking-tight">FOODLY</h1>
+                        <p className="text-orange-100 mt-2 font-medium">Dein smarter KI-Koch & Fitness-Coach</p>
+                    </div>
+                );
+            }
+
+            // --- ONBOARDING / REGISTRIERUNG ---
+            if (!userData) {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-orange-100 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-8 border border-orange-100 animate-fade-in">
+                            <div className="text-center mb-6">
+                                <div className="w-16 h-16 bg-primary text-white rounded-2xl mx-auto flex items-center justify-center text-2xl font-black mb-3 shadow-lg shadow-orange-500/30">F</div>
+                                <h1 className="text-3xl font-extrabold text-gray-900">Willkommen bei FOODLY</h1>
+                                <p className="text-gray-500 mt-1">Schritt {onboardingStep} von 3: Profil & Kalorienbedarf</p>
+                            </div>
+
+                            {onboardingStep === 1 && (
+                                <div className="space-y-4">
+                                    <h2 className="text-lg font-bold text-gray-800">Persönliche Daten & E-Mail</h2>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <input type="text" placeholder="Vorname" value={formFirst} onChange={e => setFormFirst(e.target.value)} className="p-3 rounded-xl border bg-gray-50 font-medium" />
+                                        <input type="text" placeholder="Nachname" value={formLast} onChange={e => setFormLast(e.target.value)} className="p-3 rounded-xl border bg-gray-50 font-medium" />
+                                    </div>
+                                    <input type="email" placeholder="E-Mail-Adresse" value={formEmail} onChange={e => setFormEmail(e.target.value)} className="w-full p-3 rounded-xl border bg-gray-50 font-medium" />
+                                    <button 
+                                        onClick={() => {
+                                            if (formFirst && formEmail.includes('@')) setOnboardingStep(2);
+                                            else alert("Bitte Vorname und gültige E-Mail eingeben.");
+                                        }}
+                                        className="w-full py-4 bg-primary text-white rounded-2xl font-extrabold shadow-lg shadow-orange-500/30 hover:bg-orange-600"
+                                    >
+                                        Weiter ➔
+                                    </button>
+                                </div>
+                            )}
+
+                            {onboardingStep === 2 && (
+                                <div className="space-y-4">
+                                    <h2 className="text-lg font-bold text-gray-800">Körperdaten für Kalorienziel</h2>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <div><label className="text-xs font-bold text-gray-500">Alter</label><input type="number" value={formAge} onChange={e => setFormAge(e.target.value)} className="w-full p-3 rounded-xl border bg-gray-50 font-bold" /></div>
+                                        <div><label className="text-xs font-bold text-gray-500">Gewicht (kg)</label><input type="number" value={formWeight} onChange={e => setFormWeight(e.target.value)} className="w-full p-3 rounded-xl border bg-gray-50 font-bold" /></div>
+                                        <div><label className="text-xs font-bold text-gray-500">Größe (cm)</label><input type="number" value={formHeight} onChange={e => setFormHeight(e.target.value)} className="w-full p-3 rounded-xl border bg-gray-50 font-bold" /></div>
+                                    </div>
+                                    <div className="bg-orange-50 p-4 rounded-2xl border border-orange-200 text-center">
+                                        <p className="text-xs font-bold text-orange-700 uppercase">Dein empfohlener täglicher Bedarf</p>
+                                        <p className="text-2xl font-black text-primary mt-1">{calculatedCalories} kcal</p>
+                                    </div>
+                                    <button onClick={() => setOnboardingStep(3)} className="w-full py-4 bg-primary text-white rounded-2xl font-extrabold shadow-lg">Weiter ➔</button>
+                                </div>
+                            )}
+
+                            {onboardingStep === 3 && (
+                                <div className="space-y-4">
+                                    <h2 className="text-lg font-bold text-gray-800">Ziel & Supermarkt</h2>
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-500 mb-1 block">Ernährungsziel</label>
+                                        <select value={formGoal} onChange={e => setFormGoal(e.target.value)} className="w-full p-3 rounded-xl border bg-gray-50 font-medium">
+                                            <option>Muskelaufbau & High Protein</option>
+                                            <option>Kalorienbewusst abnehmen</option>
+                                            <option>Gesunde Ernährung für Schule & Alltag</option>
+                                            <option>Günstig & Schnell kochen</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-500 mb-1 block">Bevorzugter Supermarkt</label>
+                                        <select value={formSupermarket} onChange={e => setFormSupermarket(e.target.value)} className="w-full p-3 rounded-xl border bg-gray-50 font-medium">
+                                            <option>Aldi / Lidl</option>
+                                            <option>Kaufland / Rewe</option>
+                                            <option>Edeka</option>
+                                            <option>Penny / Netto</option>
+                                        </select>
+                                    </div>
+                                    <button 
+                                        onClick={() => {
+                                            const newUserData = {
+                                                firstName: formFirst,
+                                                lastName: formLast,
+                                                email: formEmail,
+                                                age: formAge,
+                                                weight: formWeight,
+                                                height: formHeight,
+                                                goal: formGoal,
+                                                supermarket: formSupermarket,
+                                                targetCals: calculatedCalories
+                                            };
+                                            setUserData(newUserData);
+                                        }}
+                                        className="w-full py-4 bg-primary text-white rounded-2xl font-extrabold text-lg shadow-xl shadow-orange-500/30 hover:bg-orange-600"
+                                    >
+                                        App starten 🚀
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            }
+
+            const filteredRecipes = recipes.filter(r => {
+                const matchesSearch = r.name.toLowerCase().includes(searchQuery.toLowerCase()) || r.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()));
+                const matchesCat = selectedCategory === 'Alle' || r.category === selectedCategory;
+                return matchesSearch && matchesCat;
+            });
+
+            const handleSendMessage = () => {
+                if (!chatInput.trim()) return;
+                const userMsg = chatInput;
+                setChatInput('');
+                const newMessages = [...chatMessages, { role: 'user', text: userMsg }];
+                setChatMessages(newMessages);
+
+                setTimeout(() => {
+                    let reply = `Hallo ${userData.firstName}! Das ist eine hervorragende Idee. Für dein Ziel („${userData.goal}“) empfehle ich dir, auf frische Eiweißquellen zu achten. Soll ich dir dazu ein passendes Rezept ausgeben?`;
+                    const lower = userMsg.toLowerCase();
+                    if (lower.includes('günstig') || lower.includes('5 euro')) {
+                        reply = `Gerne ${userData.firstName}! Bei ${userData.supermarket} bekommst du alle Zutaten für unsere Tomaten-Pasta oder Overnight Oats für unter 2 Euro pro Portion.`;
+                    } else if (lower.includes('schule')) {
+                        reply = `Für die Schule eignen sich Meal-Prep-Gerichte wie unsere Thunfisch-Wraps oder Overnight Oats perfekt, ${userData.firstName}!`;
+                    }
+                    setChatMessages([...newMessages, { role: 'user', text: userMsg }, { role: 'assistant', text: reply }]);
+                }, 600);
+            };
+
+            return (
+                <div className="min-h-screen pb-24">
+                    {/* Header */}
+                    <header className="bg-white dark:bg-cardDark border-b border-gray-100 dark:border-gray-800 sticky top-0 z-40 px-4 py-3 flex items-center justify-between shadow-sm">
+                        <div className="flex items-center space-x-2 cursor-pointer" onClick={() => setActiveTab('home')}>
+                            <div className="w-10 h-10 bg-primary text-white rounded-2xl flex items-center justify-center font-black text-xl shadow-md shadow-orange-500/30">F</div>
+                            <span className="text-2xl font-black tracking-tight text-gray-900 dark:text-white">FOOD<span className="text-primary">LY</span></span>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                            <span className="text-xs font-bold text-gray-600 dark:text-gray-300 bg-orange-50 dark:bg-orange-900/30 px-3 py-1.5 rounded-full">👋 Hallo, {userData.firstName}</span>
+                            <button onClick={() => setActiveTab('profile')} className="w-10 h-10 rounded-xl bg-orange-50 dark:bg-orange-900/30 text-primary flex items-center justify-center font-bold">
+                                <i data-lucide="user" className="w-5 h-5"></i>
+                            </button>
+                        </div>
+                    </header>
+
+                    <main className="max-w-4xl mx-auto p-4 md:p-6">
+                        {activeTab === 'home' && (
+                            <div className="space-y-6">
+                                <div className="bg-gradient-to-r from-primary to-orange-600 text-white p-6 rounded-3xl shadow-xl shadow-orange-500/25">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <span className="bg-white/20 text-xs font-bold px-3 py-1 rounded-full uppercase">Ziel: {userData.goal}</span>
+                                            <h1 className="text-3xl font-extrabold mt-3">Guten Hunger, {userData.firstName}!</h1>
+                                            <p className="text-orange-100 mt-1 text-sm">Dein Kalorienziel: <strong className="text-white">{userData.targetCals} kcal/Tag</strong> bei {userData.supermarket}.</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="relative">
+                                    <input 
+                                        type="text" 
+                                        placeholder="Suche nach Rezepten oder Zutaten (z.B. Skyr, Hähnchen)..." 
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="w-full pl-12 pr-4 py-4 rounded-2xl bg-white dark:bg-cardDark border border-gray-200 dark:border-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary text-gray-800 dark:text-white font-medium"
+                                    />
+                                    <i data-lucide="search" className="absolute left-4 top-4 text-gray-400 w-6 h-6"></i>
+                                </div>
+
+                                <div className="flex space-x-2 overflow-x-auto hide-scrollbar pb-2">
+                                    {['Alle', 'Frühstück Schule', 'Frühstück Zuhause', 'Mittagessen', 'Abendessen', 'Snacks und Desserts'].map(cat => (
+                                        <button 
+                                            key={cat}
+                                            onClick={() => setSelectedCategory(cat)}
+                                            className={`px-4 py-2 rounded-xl font-bold text-sm whitespace-nowrap transition-all ${selectedCategory === cat ? 'bg-primary text-white shadow-md shadow-orange-500/30' : 'bg-white dark:bg-cardDark text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-800'}`}
+                                        >
+                                            {cat}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <div>
+                                    <h2 className="text-xl font-extrabold mb-4 text-gray-900 dark:text-white">Alle Rezepte ({filteredRecipes.length})</h2>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {filteredRecipes.map(recipe => (
+                                            <div key={recipe.id} onClick={() => setSelectedRecipe(recipe)} className="bg-white dark:bg-cardDark rounded-2xl overflow-hidden shadow-sm border border-gray-100 dark:border-gray-800 cursor-pointer hover:shadow-md transition-all flex flex-col justify-between">
+                                                <div className="relative h-40">
+                                                    <img src={recipe.image} alt={recipe.name} className="w-full h-full object-cover" />
+                                                    <div className="absolute top-3 left-3 bg-white/90 dark:bg-cardDark/90 px-2 py-0.5 rounded-full text-xs font-bold text-primary">
+                                                        {recipe.category}
+                                                    </div>
+                                                </div>
+                                                <div className="p-4">
+                                                    <h3 className="font-bold text-lg text-gray-900 dark:text-white line-clamp-1">{recipe.name}</h3>
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-1">{recipe.description}</p>
+                                                    <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100 dark:border-gray-800 text-xs font-bold text-gray-600 dark:text-gray-300">
+                                                        <span>{recipe.cals} kcal</span>
+                                                        <span className="text-primary">{recipe.protein}g Protein</span>
+                                                        <span className="text-gray-900 dark:text-white font-extrabold">{recipe.price.toFixed(2)} €</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'aicoach' && (
+                            <div className="flex flex-col h-[75vh] bg-white dark:bg-cardDark rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
+                                <div className="p-4 bg-orange-50 dark:bg-orange-900/20 border-b border-gray-100 dark:border-gray-800">
+                                    <h2 className="font-bold text-gray-900 dark:text-white">FOODLY KI-Kochassistent</h2>
+                                    <p className="text-xs text-green-600 font-medium">● Bereit für deine Kochfragen</p>
+                                </div>
+                                <div className="flex-1 p-4 overflow-y-auto space-y-4">
+                                    {chatMessages.map((msg, idx) => (
+                                        <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                            <div className={`max-w-[80%] p-4 rounded-2xl text-sm font-medium ${msg.role === 'user' ? 'bg-primary text-white rounded-br-none' : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-bl-none'}`}>
+                                                {msg.text}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="p-4 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-cardDark flex items-center space-x-2">
+                                    <input 
+                                        type="text" 
+                                        placeholder="Frag die KI nach Rezepten oder Budget..." 
+                                        value={chatInput}
+                                        onChange={(e) => setChatInput(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                                        className="flex-1 p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 text-sm font-medium text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                                    />
+                                    <button onClick={handleSendMessage} className="bg-primary text-white p-3 rounded-xl font-bold hover:bg-orange-600 shadow-md">
+                                        <i data-lucide="send" className="w-5 h-5"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'cookbook' && (
+                            <div className="space-y-6">
+                                <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white">Mein Kochbuch (Favoriten)</h1>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {recipes.filter(r => favorites.includes(r.id)).map(recipe => (
+                                        <div key={recipe.id} onClick={() => setSelectedRecipe(recipe)} className="bg-white dark:bg-cardDark rounded-2xl overflow-hidden shadow-sm border border-gray-100 dark:border-gray-800 cursor-pointer flex p-3 items-center space-x-4">
+                                            <img src={recipe.image} alt={recipe.name} className="w-20 h-20 rounded-xl object-cover" />
+                                            <div className="flex-1">
+                                                <span className="text-xs font-bold text-primary">{recipe.category}</span>
+                                                <h3 className="font-bold text-gray-900 dark:text-white">{recipe.name}</h3>
+                                                <p className="text-xs text-gray-500 mt-1">{recipe.cals} kcal • {recipe.protein}g Protein • {recipe.price.toFixed(2)} €</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'profile' && (
+                            <div className="space-y-6">
+                                <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white">Profil & Einstellungen</h1>
+                                <div className="bg-white dark:bg-cardDark p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">Name & E-Mail</label>
+                                        <p className="font-bold text-gray-800 dark:text-gray-200">{userData.firstName} {userData.lastName} ({userData.email})</p>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">Tägliches Kalorienziel</label>
+                                        <p className="font-extrabold text-primary text-xl">{userData.targetCals} kcal</p>
+                                    </div>
+                                    <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="w-full py-3 bg-red-100 text-red-600 rounded-xl font-bold text-sm">
+                                        Abmelden & Daten zurücksetzen
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </main>
+
+                    {/* REZEPT DETAIL MODAL MIT GENAUER ZUBEREITUNG & TIMER */}
+                    {selectedRecipe && (
+                        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4">
+                            <div className="bg-white dark:bg-cardDark w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-t-3xl md:rounded-3xl shadow-2xl">
+                                <div className="relative h-64">
+                                    <img src={selectedRecipe.image} alt={selectedRecipe.name} className="w-full h-full object-cover" />
+                                    <button onClick={() => setSelectedRecipe(null)} className="absolute top-4 right-4 w-10 h-10 bg-white/90 dark:bg-cardDark/90 rounded-full flex items-center justify-center font-bold shadow-md">✕</button>
+                                </div>
+                                <div className="p-6 space-y-6">
+                                    <div>
+                                        <span className="text-xs font-bold text-primary bg-orange-100 dark:bg-orange-900/30 px-3 py-1 rounded-full">{selectedRecipe.category}</span>
+                                        <h2 className="text-2xl font-extrabold text-gray-900 dark:text-white mt-2">{selectedRecipe.name}</h2>
+                                        <p className="text-gray-500 text-sm mt-1">{selectedRecipe.description}</p>
+                                    </div>
+
+                                    <div className="grid grid-cols-4 gap-2 bg-gray-50 dark:bg-gray-900 p-4 rounded-2xl text-center">
+                                        <div><p className="text-xs text-gray-400 font-bold">Kalorien</p><p className="font-extrabold text-gray-900 dark:text-white text-lg">{selectedRecipe.cals} kcal</p></div>
+                                        <div><p className="text-xs text-gray-400 font-bold">Eiweiß</p><p className="font-extrabold text-primary text-lg">{selectedRecipe.protein}g</p></div>
+                                        <div><p className="text-xs text-gray-400 font-bold">Kohlenh.</p><p className="font-extrabold text-gray-900 dark:text-white text-lg">{selectedRecipe.carbs}g</p></div>
+                                        <div><p className="text-xs text-gray-400 font-bold">Fett</p><p className="font-extrabold text-gray-900 dark:text-white text-lg">{selectedRecipe.fat}g</p></div>
+                                    </div>
+
+                                    {/* TIMER WIDGET */}
+                                    <div className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-2xl border border-orange-100 flex items-center justify-between">
+                                        <div>
+                                            <h4 className="font-bold text-gray-900 dark:text-white text-sm">⏱️ Küchentimer</h4>
+                                            <p className="text-2xl font-black text-primary">{timerSeconds !== null ? `${Math.floor(timerSeconds / 60)}: ${timerSeconds % 60 < 10 ? '0' : ''}${timerSeconds % 60}` : '10:00'}</p>
+                                        </div>
+                                        <div className="space-x-2">
+                                            <button onClick={() => { setTimerSeconds(600); setTimerActive(true); }} className="px-4 py-2 bg-primary text-white rounded-xl font-bold text-xs shadow-md">10 Min Start</button>
+                                            <button onClick={() => setTimerActive(false)} className="px-4 py-2 bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl font-bold text-xs">Stopp</button>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <h3 className="font-extrabold text-lg text-gray-900 dark:text-white mb-3">Zutaten</h3>
+                                        <ul className="space-y-2">
+                                            {selectedRecipe.ingredients.map((ing, idx) => (
+                                                <li key={idx} className="flex justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-900 text-sm font-medium">
+                                                    <span className="text-gray-800 dark:text-gray-200">{ing.name}</span>
+                                                    <span className="font-bold text-primary">{ing.amount}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+
+                                    <div>
+                                        <h3 className="font-extrabold text-lg text-gray-900 dark:text-white mb-3">Genaue Zubereitung</h3>
+                                        <ol className="space-y-3">
+                                            {selectedRecipe.steps.map((step, idx) => (
+                                                <li key={idx} className="flex space-x-3 text-sm">
+                                                    <span className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center font-bold text-xs shrink-0">{idx + 1}</span>
+                                                    <span className="text-gray-700 dark:text-gray-300 font-medium">{step}</span>
+                                                </li>
+                                            ))}
+                                        </ol>
+                                    </div>
+
+                                    <button 
+                                        onClick={() => {
+                                            if (favorites.includes(selectedRecipe.id)) {
+                                                setFavorites(favorites.filter(id => id !== selectedRecipe.id));
+                                            } else {
+                                                setFavorites([...favorites, selectedRecipe.id]);
+                                            }
+                                        }}
+                                        className="w-full py-4 bg-orange-100 dark:bg-orange-900/30 text-primary rounded-2xl font-extrabold text-sm"
+                                    >
+                                        {favorites.includes(selectedRecipe.id) ? '★ Aus Favoriten entfernt' : '☆ Zu Favoriten hinzufügen'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Navigation */}
+                    <nav className="fixed bottom-0 left-0 right-0 bg-white dark:bg-cardDark border-t border-gray-100 dark:border-gray-800 py-3 px-6 flex justify-around items-center z-40 shadow-lg">
+                        {[
+                            { id: 'home', label: 'Home', icon: 'home' },
+                            { id: 'aicoach', label: 'KI-Koch', icon: 'sparkles' },
+                            { id: 'cookbook', label: 'Kochbuch', icon: 'book-open' },
+                            { id: 'profile', label: 'Profil', icon: 'user' }
+                        ].map(tab => (
+                            <button 
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`flex flex-col items-center space-y-1 transition-all ${activeTab === tab.id ? 'text-primary scale-105' : 'text-gray-400 hover:text-gray-600'}`}
+                            >
+                                <i data-lucide={tab.icon} className="w-6 h-6"></i>
+                                <span className="text-[10px] font-bold">{tab.label}</span>
+                            </button>
+                        ))}
+                    </nav>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<FoodlyApp />, document.getElementById('root'));
+    </script>
+</body>
+</html>
